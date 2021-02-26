@@ -1,0 +1,52 @@
+#!/bin/bash
+# Déclarer les variables
+NOMUTIL=Jean-Paul
+EMPLACEMENT=~/Documents/Outils/Exécutables/Script_Sauvegarde
+EMPLACEMENTSTAT=~/Documents/Outils/Exécutables/Script_Sauvegarde/Statistiques_Globales
+SERVEUR=cemealg.myftp.org
+SERVEUR2=cemeabx.myftp.org
+UTILISATEUR=jplback
+STAT=Backup/Statistiques/
+STATFILE=$EMPLACEMENTSTAT/Statistiques.txt
+STATFILELG=$EMPLACEMENTSTAT/StatistiquesLG.txt
+STATFILEBX=$EMPLACEMENTSTAT/StatistiquesBX.txt
+STATFILEGLOB=$EMPLACEMENTSTAT/StatistiquesGlobales.txt
+nbrejours=10
+delai=$(date -d "+1 day" +%d-%B-%Y)
+delai10=$(date -d "-$nbrejours days" +%d-%B-%Y)
+erreur=0
+
+# Définir les fonctions
+# Fonction qui effectue la sauvegarde et ecrit le résultat dans le fichier journal
+	rsync -az -e ssh --ignore-errors --force $UTILISATEUR@$SERVEUR::$STAT $EMPLACEMENTSTAT
+	erreur=$(grep -c $delai10 $STATFILE)
+	until [ $erreur != "0" ]
+		do
+		((nbrejours--))
+		erreur=$(grep -c $delai10 $STATFILE)
+		delai10=$(date -d "-$nbrejours days" +%d-%B-%Y)
+		done
+	sed -i '/'$delai10'/,/'$delai'/!d;//d' $STATFILE
+	mv $STATFILE $STATFILELG	
+#	rsync -az -e ssh --ignore-errors --force $UTILISATEUR@$SERVEUR::$STAT $EMPLACEMENTSTAT
+	
+	rsync -az -e ssh --ignore-errors --force $UTILISATEUR@$SERVEUR2::$STAT $EMPLACEMENTSTAT
+	erreur=$(grep -c $delai10 $STATFILE)
+	until [ $erreur != "0" ]
+		do
+		((nbrejours--))
+		erreur=$(grep -c $delai10 $STATFILE)
+		delai10=$(date -d "-$nbrejours days" +%d-%B-%Y)
+		done		
+	sed -i '/'$delai10'/,/'$delai'/!d;//d' $STATFILE	
+	mv $STATFILE $STATFILEBX	
+	rm $STATFILEGLOB			
+	echo "$NOMUTIL à récupéré les statistiques de backup sur les serveurs de Liège et Bruxelles le $(date +%d-%B-%Y) à $(date +%H:%M:%S)" >> $STATFILEGLOB
+	echo "--------------------------------------Statistiques de Liège--------------------------------------" >> $STATFILEGLOB
+	cat $STATFILELG >> $STATFILEGLOB
+	echo "--------------------------------------Statistiques de Bruxelles--------------------------------------" >> $STATFILEGLOB
+	cat $STATFILEBX >> $STATFILEGLOB
+	rm $STATFILELG
+	rm $STATFILEBX
+	read
+exit

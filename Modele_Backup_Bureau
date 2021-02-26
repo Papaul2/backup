@@ -1,0 +1,177 @@
+#!/bin/bash
+
+Déclaration des variables
+
+VARNOMUTIL=`zenity --entry --title="Nom de la personne" --text="Saisissez le nom de la personne :" --entry-text "Jean-Paul"`
+		if [ -z $VARNOMUTIL ]	
+	then	
+		zenity --info --title="Réseau" --text="Le script est annulée. "
+		exit
+	fi
+	
+SERVEUR=$(zenity --list --width=400 --height=200 \
+  --title="Choisissez le lieu ou la sauvagarde doit être stockée" \
+  --column="ID" --column="Lieu" \
+  cemealg.myftp.org  "Liège" \
+  cemeabx.myftp.org  "Bruxelles" )
+	if [ -z $SERVEUR ]	
+	then	
+		zenity --info --title="Réseau" --text="Vous n'avez pas sélectionné de lieu. \n\nLe script est annulée. "
+		exit
+	fi
+
+VARUTILISATEUR=`zenity --entry --title="Nom de l'utilisateur sur le serveur" --text="Saisissez le nom de l'utilisateur :" --entry-text "jplback"`
+	if [ -z $VARUTILISATEUR ]	
+	then	
+		zenity --info --title="Réseau" --text="Le script est annulée. "
+		exit
+	fi
+VAREMPLACEMENT=`zenity --file-selection --directory --filename="~/Documents/Backup/" --title="Sélectionnez un dossier"`
+
+case $? in
+        0)
+              Repcible="$Dossier_cible";;
+        1)
+              Repcible="Aucun dossier sélectionné."
+	      zenity --error --text="$Repcible"
+	      exit;;
+        -1)
+              Repcible="Une erreur inattendue est survenue."
+	      exit;;
+esac
+
+VAREXCLURE=`zenity --file-selection --directory --multiple --separator="\n" --filename="/home/$USER/" --title="Sélectionnez les dossiers à exclure"`
+
+case $? in
+        0)
+              Repcible="$Dossier_cible";;
+        1)
+              Repcible="Aucun dossier sélectionné."
+	      zenity --error --text="$Repcible"
+	      exit;;
+        -1)
+              Repcible="Une erreur inattendue est survenue."
+	      exit;;
+esac
+
+echo '#!/bin/bash
+
+# Déclarer les variables
+NOMUTIL='$VARNOMUTIL'
+EMPLACEMENT='$VAREMPLACEMENT'
+SERVEUR='$SERVEUR'
+UTILISATEUR='$VARUTILISATEUR'
+SOURCE=~/
+CIBLE=Backup/'$VARNOMUTIL'/Rsync/
+BACKUP=Backup/'$VARNOMUTIL'/Old/$(date +%Y-%m-%d)
+STAT=Backup/Statistiques/
+EXCLUSION=$EMPLACEMENT/ExclusionRSyncBureau.txt
+LOGFILE=$EMPLACEMENT/LogRsyncBureau_$(date +%Y-%m-%d).txt
+LOGFILESUCCES=$EMPLACEMENT/LogRsyncBureau_$(date +%Y-%m-%d)-SUCCES.txt
+LOGFILEERREUR=$EMPLACEMENT/LogRsyncBureau_$(date +%Y-%m-%d)-ECHEC.txt
+STATFILE=$EMPLACEMENT/Statistiques.txt
+
+# Définir les fonctions
+# Fonction qui effectue la sauvegarde et ecrit le résultat dans le fichier journal
+sauvegarde () {
+# Créer le journal
+touch $LOGFILE
+# Ecriture dans le journal
+	echo "---------------------------------------------------------------------------------------------------------------------" >> $LOGFILE
+	# Ecrire le nom de la sauvegarde dans le journal
+	echo "Sauvegarde de $SOURCE du $(date +%d-%B-%Y)" >> $LOGFILE
+	echo "---------------------------------------------------------------------------------------------------------------------" >> $LOGFILE
+	# Ecrire l'\''heure de début du transfert dans le journal
+	echo "Heure de demarrage de la sauvegarde : $(date +%H:%M:%S)" >> $LOGFILE
+	echo "---------------------------------------------------------------------------------------------------------------------" >> $LOGFILE
+# Exécution de la sauvegarde
+	rsync -avz -e ssh --delete --stats --ignore-errors --force --exclude-from=$EXCLUSION $SOURCE $UTILISATEUR@$SERVEUR::$CIBLE >> $LOGFILE
+#	rsync -avz -e ssh --delete --stats --ignore-errors --force --exclude-from=$EXCLUSION --backup --backup-dir=$BACKUP/ $SOURCE $UTILISATEUR@$SERVEUR::$CIBLE >> $LOGFILE
+# Récupération du code de sortie
+	status=$?
+	echo "---------------------------------------------------------------------------------------------------------------------" >> $LOGFILE
+# Rendre le code de sortie lisible et l'\''écrire dans le journal
+case $status in
+	0) echo "Succès" >> $LOGFILE;;
+	1) echo "Erreur de syntaxe ou d'\''utilisation" >> $LOGFILE;;
+	2) echo "Incompatibilité de protocole" >> $LOGFILE;;
+	3) echo "Erreurs lors de la sélection des fichiers et des répertoires d'\''entrée/sortie" >> $LOGFILE;;
+	4) echo "Action non supportée : une tentative de manipulation de fichiers 64-bits sur une plate-forme qui ne les supporte pas ou une option qui est supportée par le client mais pas par le serveur." >> $LOGFILE;;
+	5) echo "Erreur lors du démarrage du protocole client-serveur" >> $LOGFILE;;
+	6) echo "Démon incapable d'\''écrire dans le fichier de log" >> $LOGFILE;;
+	10) echo "Erreur dans la socket E/S" >> $LOGFILE;;
+	11) echo "Erreur d'\''E/S fichier" >> $LOGFILE;;
+	12) echo "Erreur dans le flux de donnée du protocole rsync" >> $LOGFILE;;
+	13) echo "Erreur avec les diagnostics du programme" >> $LOGFILE;;
+	14) echo "Erreur dans le code IPC" >> $LOGFILE;;
+	20) echo "SIGUSR1 ou SIGINT reçu" >> $LOGFILE;;
+	21) echo "Une erreur retournée par waitpid()" >> $LOGFILE;;
+	22) echo "Erreur lors de l'\''allocation des tampons de mémoire principaux" >> $LOGFILE;;
+	23) echo "Transfert partiel du à une erreur" >> $LOGFILE;;
+	24) echo "Transfert partiel du à la disparition d'\''un fichier source" >> $LOGFILE;;
+	25) echo "La limite --max-delete a été atteinte" >> $LOGFILE;;
+	30) echo "Dépassement du temps d'\''attente maximal lors d'\''envoi/réception de données" >> $LOGFILE;;
+	35) echo "Temps d’attente dépassé en attendant une connection" >> $LOGFILE;;
+	255) echo "Erreur inexpliquée" >> $LOGFILE;;
+esac
+echo "---------------------------------------------------------------------------------------------------------------------" >> $LOGFILE
+# Ecrire l'\''heure de fin dans le journal
+echo "Heure de fin de la sauvegarde : $(date +%H:%M:%S)" >> $LOGFILE
+echo "---------------------------------------------------------------------------------------------------------------------" >> $LOGFILE
+}
+
+# Effectuer la sauvegarde
+# Ne pas effectuer si une sauvegarde réussie à eu lieu dans la journée
+if [ -f $LOGFILESUCCES ]
+then
+notify-send "Sauvegarde Bureau" "La sauvegarde à déjà été effectuée avec succés aujourd'\''hui"
+exit
+# Si pas de sauvegarde effectuer la sauvegarde et avertir l'\''utilisateur du résultat
+else
+sauvegarde
+	if [ $status -eq 0 ]
+	then
+	# Renommer le fichier en cas de succès et avertir
+	mv $LOGFILE $LOGFILESUCCES
+	notify-send "Sauvegarde Bureau" "Sauvegarde effectuée avec succès"
+	echo "Sauvegarde Bureau a Liege effectuee avec succes" | mail -s "Sauvarde Rsync" jpl@cemea.be
+	rsync -az -e ssh --ignore-errors --force $UTILISATEUR@$SERVEUR::$STAT $EMPLACEMENT	
+	echo "Sauvegarde $NOMUTIL effectuée avec succès -- le $(date +%d-%B-%Y) à $(date +%H:%M:%S)" >> $STATFILE
+	rsync -az -e ssh --delete --ignore-errors --force $STATFILE $UTILISATEUR@$SERVEUR::$STAT	
+	find $EMPLACEMENT/ -name "LogRsyncBureau*" -ctime +30 -exec rm -f {} \;
+#	find $BACKUP/ -mindepth 1 -name "*" -mtime +30 -exec rm -R -f {} \;
+	else
+	# Renommer le fichier en cas d'\''échec et avertir
+	mv $LOGFILE $LOGFILEERREUR
+	notify-send "Sauvegarde Bureau" "Sauvegarde non effectuée car erreurs (vérifier le ficher de log)"
+	echo "Sauvegarde Bureau a Liege echouee" | mail -s "Sauvarde Rsync" jpl@cemea.be
+	rsync -az -e ssh --ignore-errors --force $UTILISATEUR@$SERVEUR::$STAT $EMPLACEMENT	
+	echo "/!\Sauvegarde $NOMUTIL effectuée avec erreurs -- le $(date +%d-%B-%Y) à $(date +%H:%M:%S)" >> $STATFILE
+	rsync -az -e ssh --delete --ignore-errors --force $STATFILE $UTILISATEUR@$SERVEUR::$STAT	
+	fi
+fi
+exit'> $VAREMPLACEMENT/Backup_Bureau
+
+echo '[Desktop Entry]
+Type=Application
+Name=Backup Bureau
+GenericName=Backup
+Comment=Sauvegarde vers le serveur à Liège
+Exec=sh -c '$VAREMPLACEMENT'/Backup_Bureau
+Terminal=true  #ouvrir ou non un terminal lors de l'\''exécution du programme (false ou true)
+StartupNotify=false  #notification de démarrage ou non (false ou true)
+Categories=Backup
+Icon='$VAREMPLACEMENT'/backup2.png' > $VAREMPLACEMENT/Backup_Bureau.desktop
+
+cp ./backup2.png $VAREMPLACEMENT
+cp ./Modele_ExclusionRSyncBureau.txt $VAREMPLACEMENT/ExclusionRSyncBureau.txt
+
+echo -e $VAREXCLURE >> $VAREMPLACEMENT/ExclusionRSyncBureau.txt
+
+sed -i "s/\/home\/$USER\///" $VAREMPLACEMENT/ExclusionRSyncBureau.txt
+
+chmod ugo+x $VAREMPLACEMENT/Backup_Bureau.desktop
+chmod ugo+x $VAREMPLACEMENT/Backup_Bureau
+cp $VAREMPLACEMENT/Backup_Bureau.desktop ~/Bureau/Backup_Bureau.desktop
+mv $VAREMPLACEMENT/Backup_Bureau.desktop ~/.config/autostart/Backup_Bureau.desktop
+exit
